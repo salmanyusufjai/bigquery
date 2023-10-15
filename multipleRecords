@@ -1,0 +1,32 @@
+WITH UniqueMatchkeyCounts AS (
+  SELECT
+    entitykey AS journal_entitykey,
+    ARRAY_AGG(DISTINCT matchkey) AS unique_matchkeys
+  FROM
+    journal
+  GROUP BY
+    entitykey
+),
+
+CombinedData AS (
+  SELECT
+    pv.entitykey AS purposedView_entitykey,
+    pv.CCJ AS purposedView_CCJ,
+    j.journal_entitykey,
+    j.unique_matchkeys
+  FROM
+    purposedView AS pv
+  LEFT JOIN
+    UniqueMatchkeyCounts AS j
+  ON
+    pv.entitykey = j.journal_entitykey
+)
+
+SELECT
+  COUNT(*) AS total_records_in_purposedView,
+  COUNTIF(
+    ARRAY_LENGTH(pv.purposedView_CCJ) = ARRAY_LENGTH(j.unique_matchkeys)
+    AND ARRAY_LENGTH(pv.purposedView_CCJ) > 0
+  ) AS matching_records
+FROM
+  CombinedData AS pv;
