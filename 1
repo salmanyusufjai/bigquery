@@ -1,0 +1,22 @@
+WITH UniqueMatchkeyCounts AS (
+  SELECT
+    entitykey AS journal_entitykey,
+    ARRAY_AGG(DISTINCT matchkey) AS unique_matchkeys
+  FROM
+    journal
+  GROUP BY
+    entitykey
+)
+
+SELECT
+  pv.entitykey AS purposedView_entitykey,
+  pv.CCJ AS purposedView_CCJ
+FROM
+  purposedView AS pv
+LEFT JOIN
+  UniqueMatchkeyCounts AS j
+ON
+  pv.entitykey = j.journal_entitykey
+WHERE
+  NOT ARRAY_LENGTH(pv.CCJ) = ARRAY_LENGTH(j.unique_matchkeys)
+  OR NOT ARRAY_LENGTH(pv.CCJ) > 0;
