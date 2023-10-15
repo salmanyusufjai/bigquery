@@ -30,3 +30,13 @@ SELECT
   ) AS matching_records
 FROM
   CombinedData AS pv;
+
+In this query:
+
+The first CTE, UniqueMatchkeyCounts, aggregates the distinct matchkey values for each entitykey in the journal table into an array.
+
+The second CTE, CombinedData, joins the purposedView and journal tables based on the entitykey and includes the unique_matchkeys array.
+
+The main query calculates the total records in the purposedView table and counts the records where the purposedView_CCJ array has the same length as the unique_matchkeys array and both arrays are not empty. This checks if the CCJ column in purposedView contains all unique matchkey values from the journal table for the same entitykey.
+
+Please replace purposedView and journal with your actual table names and adjust the column names as needed to match your specific dataset.
