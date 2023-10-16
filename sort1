@@ -1,0 +1,21 @@
+SELECT
+    p.entitykey,
+    CASE
+        WHEN ARRAY_AGG(j.matchkey ORDER BY
+            CASE
+                WHEN j.loaddate IS NOT NULL THEN j.loaddate
+                WHEN j.process_date IS NOT NULL THEN j.process_date
+                ELSE j.defaultdate
+            END
+        ) = ARRAY_AGG(j.matchkey)
+        THEN 'Proper'
+        ELSE 'Improper'
+    END AS ccj_data_verification
+FROM
+    purpose p
+JOIN
+    journal j
+ON
+    p.entitykey = j.entitykey
+GROUP BY
+    p.entitykey;
