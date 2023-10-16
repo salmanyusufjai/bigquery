@@ -1,0 +1,34 @@
+WITH SortedCCJ AS (
+    SELECT
+        entitykey,
+        ARRAY_AGG(matchkey ORDER BY sort_order) AS sorted_ccj
+    FROM
+        purpose
+    CROSS JOIN
+        UNNEST(CCJ) AS t(matchkey, sort_order)
+    GROUP BY
+        entitykey
+),
+
+SortedJournal AS (
+    SELECT
+        entitykey,
+        ARRAY_AGG(matchkey ORDER BY sort_order) AS sorted_journal
+    FROM
+        journal
+    GROUP BY
+        entitykey
+)
+
+SELECT
+    p.entitykey,
+    CASE
+        WHEN sorted_ccj = sorted_journal THEN 'Proper'
+        ELSE 'Improper'
+    END AS ccj_data_verification
+FROM
+    SortedCCJ p
+LEFT JOIN
+    SortedJournal j
+ON
+    p.entitykey = j.entitykey;
