@@ -1,0 +1,8 @@
+SELECT
+    entitykey,
+    COUNT(DISTINCT matchkey) AS unique_matchkey_count,
+    COUNTIF(DATE(loaddate) < DATE_SUB(CURRENT_DATE(), INTERVAL 6 YEAR)) AS old_loaddate_count
+FROM
+    `your_project.your_dataset.your_table`
+GROUP BY
+    entitykey;
