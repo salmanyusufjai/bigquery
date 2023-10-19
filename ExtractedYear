@@ -1,0 +1,15 @@
+WITH ExtractedYear AS (
+  SELECT
+    entity_key,
+    CAST(EXTRACT(YEAR FROM PARSE_DATE('%Y-%m-%d', loaddate)) AS INT64) AS loaddate_year
+  FROM
+    your_project_id.your_dataset_id.your_table_id
+)
+
+SELECT
+  entity_key,
+  MAX(EXTRACT(CURRENT_YEAR()) - loaddate_year) AS years_old
+FROM
+  ExtractedYear
+GROUP BY
+  entity_key;
