@@ -1,0 +1,23 @@
+WITH ScoreDifferences AS (
+  SELECT
+    t1.company_number,
+    t1.score AS score_table1,
+    t2.score AS score_table2,
+    ABS(t1.score - t2.score) AS score_difference
+  FROM
+    `your_project.your_dataset.table1` t1
+  JOIN
+    `your_project.your_dataset.table2` t2
+  ON
+    t1.company_number = t2.company_number
+)
+
+SELECT
+  COUNT(*) AS total_count,
+  COUNTIF(score_table1 = score_table2) AS same_score_count,
+  COUNTIF(score_difference >= 0 AND score_difference <= 5) AS score_diff_0_to_5_count,
+  COUNTIF(score_difference > 5 AND score_difference <= 10) AS score_diff_5_to_10_count,
+  COUNTIF(score_difference > 10 AND score_difference <= 15) AS score_diff_10_to_15_count,
+  -- Add more counts for other score ranges as needed
+FROM
+  ScoreDifferences;
