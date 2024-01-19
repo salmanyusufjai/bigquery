@@ -1,0 +1,13 @@
+SELECT
+  json_table.*,
+  EXISTS (
+    SELECT 1
+    FROM UNNEST(json_table.json_column) AS json_array
+    WHERE json_array.your_array_field = rundate_table.rundate
+  ) AS is_match
+FROM
+  your_project.your_dataset.json_data AS json_table
+JOIN
+  your_project.your_dataset.events AS rundate_table
+ON
+  true;  -- Replace this with the actual join condition
