@@ -1,0 +1,21 @@
+received datafabric historical monthly snapshot from UST team
+Create table which in the same strucure of Scorecheck, ACL score, Protect score, Noli ACL and Corpscore score
+Populate those table from the historical Scorecheck, ACL score, Protect score, Noli ACL and Corpscore score
+
+1) Received file from client file which contain CRN or CompanyName,address or postcode and rundate
+GBP team process that file and provide us each CRN with its entity key and rundate and store that on bigquery / bigtable
+
+2) GBP team or D&A team select entitykye,CRN and rundate and group by records from that table using rundate
+3) GBP team or D&A team select snapshot based on the rundate and fetch the company PV  from that snapshot using entitykey
+4) GBP team or D&A team fetch Scorecheck, ACL score, Protect score, Noli ACL and Corpscore score from the respective table based on the rundate for each CRN found in the above query append those scores in the PV
+5) Using that PV, process will call the EBI model and model will calculate EBI Chars
+Model will store those EBI chars in the temp bigquery table
+6) After all process done, D&A or GBP team merge those different bigquery table which contain retro data and write them on the file and send it to client file team
+7) Cleaning process for delete temp table would perform at the end
+
+For live
+GBP  or D&A team store score output in the table after each delta 
+then for ebi, repete above process 
+
+
+
