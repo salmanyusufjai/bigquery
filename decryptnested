@@ -1,22 +1,41 @@
-WITH decrypted_data AS (
+-- Decrypt the fields in rawfields using the decryption key from mainf
+WITH flattened_data AS (
   SELECT
     t.*,
-    latest,
     mainf.decryption_key,
+    latest_entry,
+    OFFSET AS row_index
+  FROM
+    `your_dataset.your_table` t,
+    UNNEST(account.latest) AS latest_entry WITH OFFSET
+),
+decrypted_data AS (
+  SELECT
+    *,
     ARRAY(
       SELECT AS STRUCT
         key,
         CASE
-          WHEN key = 'f1' THEN DECRYPT_STRING(value, mainf.decryption_key)
+          WHEN key = 'f1' THEN DECRYPT_STRING(value, decryption_key)
           ELSE value
         END AS value
-      FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(latest.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS kv(key, value)
+      FROM (
+        SELECT 
+          REGEXP_EXTRACT(kv, r'"([^"]+)":') AS key,
+          REGEXP_EXTRACT(kv, r':\s*"([^"]*)"') AS value
+        FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(latest_entry.rawfields), r'"[^"]+":\s*"[^"]*"')) AS kv
+      )
     ) AS decrypted_rawfields
   FROM
-    `your_dataset.your_table` t,
-    UNNEST(account.latest) AS latest
+    flattened_data
 )
 SELECT
-  *
+  *,
+  ARRAY(
+    SELECT AS STRUCT
+      decrypted_rawfields.key,
+      decrypted_rawfields.value,
+      latest_entry.stdfields
+  ) AS decrypted_latest
 FROM
   decrypted_data;
