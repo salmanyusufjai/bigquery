@@ -1,0 +1,24 @@
+WITH decrypted_data AS (
+  SELECT
+    mainf,
+    ARRAY(
+      SELECT AS STRUCT
+        STRUCT(
+          DECRYPT_STRING(latest_entry.rawfields.f1) AS f1,
+          latest_entry.rawfields.f2 AS f2
+        ) AS rawfields,
+        latest_entry.stdfields
+      FROM UNNEST(account.latest) AS latest_entry
+    ) AS account_latest,
+    subject
+  FROM
+    `your_dataset.your_table`
+)
+SELECT
+  mainf,
+  STRUCT(
+    account_latest AS latest
+  ) AS account,
+  subject
+FROM
+  decrypted_data;
