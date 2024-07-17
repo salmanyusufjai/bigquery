@@ -1,36 +1,29 @@
--- Step 1: Extract and flatten the nested structure
+-- Step 1: Flatten the nested structure and include an identifier for the original rows
 WITH flattened_data AS (
   SELECT
     TO_JSON_STRING(t) AS original_json,
+    t.*,
     account.latest AS account_latest,
+    mainf.decryption_key AS decryption_key,
     OFFSET AS row_index
   FROM
     `your_dataset.your_table` t,
     UNNEST(t.account.latest) AS account_latest WITH OFFSET
 ),
 
--- Step 2: Decrypt all fields dynamically in the `rawfields` object
+-- Step 2: Decrypt the fields in rawfields using the decryption key from mainf
 decrypted_data AS (
   SELECT
-    original_json,
-    row_index,
-    account_latest,
-    (
+    *,
+    ARRAY(
       SELECT AS STRUCT
-        ARRAY(
-          SELECT
-            STRUCT(
-              key AS key,
-              CASE
-                WHEN key = 'f1' THEN DECRYPT_STRING(value)
-                ELSE value
-              END AS value
-            )
-          FROM
-            UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(account_latest.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS rawfields(key, value)
-        ) AS rawfields,
-        account_latest.stdfields
-    ) AS decrypted_account_latest
+        key,
+        CASE
+          WHEN key = 'f1' THEN DECRYPT_STRING(value, decryption_key)
+          ELSE value
+        END AS value
+      FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(account_latest.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS rawfields(key, value)
+    ) AS decrypted_rawfields
   FROM
     flattened_data
 ),
@@ -41,27 +34,16 @@ reassembled_data AS (
     original_json,
     ARRAY_AGG(
       STRUCT(
-        (
-          SELECT AS STRUCT
-            ARRAY(
-              SELECT AS STRUCT
-                r.key AS key,
-                r.value AS value
-              FROM UNNEST(
-                (
-                  SELECT ARRAY(
-                    SELECT
-                      STRUCT(
-                        key AS key,
-                        value AS value
-                      )
-                    FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(decrypted_account_latest.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS r(key, value)
-                  )
-                )
-              ) AS r
-            ) AS rawfields,
-            decrypted_account_latest.stdfields AS stdfields
-        ) AS account
+        (SELECT AS STRUCT ARRAY(
+          SELECT AS STRUCT key, value
+          FROM UNNEST(
+            SELECT ARRAY(
+              SELECT STRUCT(key, value)
+              FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(decrypted_rawfields), r'"([^"]+)":\s*"([^"]*)"'))
+            )
+          ) AS r
+        )) AS rawfields,
+        account_latest.stdfields AS stdfields
       ) ORDER BY row_index
     ) AS latest
   FROM
@@ -70,13 +52,16 @@ reassembled_data AS (
     original_json
 )
 
--- Step 4: Reconstruct the entire JSON structure
+-- Step 4: Select the final structure maintaining the original format
 SELECT
-  JSON_EXTRACT_SCALAR(original_json, '$') AS mainf,
-  JSON_EXTRACT(original_json, '$.subject') AS subject,
-  JSON_EXTRACT(original_json, '$.other_object_1') AS other_object_1,
-  JSON_EXTRACT(original_json, '$.other_object_2') AS other_object_2,
-  -- Add more objects as necessary
-  STRUCT(latest AS latest) AS account
+  TO_JSON_STRING(
+    STRUCT(
+      JSON_EXTRACT(original_json, '$.mainf') AS mainf,
+      STRUCT(latest AS latest) AS account,
+      JSON_EXTRACT(original_json, '$.subject') AS subject,
+      -- Include all other objects dynamically
+      JSON_EXTRACT(original_json, '$') AS other_objects
+    )
+  ) AS final_json
 FROM
   reassembled_data;
