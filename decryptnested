@@ -13,27 +13,16 @@ WITH flattened_data AS (
 -- Step 2: Decrypt the fields in rawfields using the decryption key from mainf
 decrypted_data AS (
   SELECT
-    original_json,
-    mainf,
-    account,
-    subject,
-    row_index,
-    account_latest,
-    (
+    flattened_data.*,
+    ARRAY(
       SELECT AS STRUCT
-        ARRAY(
-          SELECT
-            STRUCT(
-              REGEXP_EXTRACT(pair, r'^([^:]+)') AS key,
-              CASE
-                WHEN REGEXP_EXTRACT(pair, r'^([^:]+)') = 'f1' THEN DECRYPT_STRING(REGEXP_EXTRACT(pair, r':\s*"([^"]+)"'), mainf.decryption_key)
-                ELSE REGEXP_EXTRACT(pair, r':\s*"([^"]+)"')
-              END AS value
-            )
-          FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(account_latest.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS pair
-        ) AS rawfields,
-        account_latest.stdfields
-    ) AS decrypted_account_latest
+        REGEXP_EXTRACT(kv, r'"([^"]+)":\s*".*?([^"]+)"') AS key,
+        CASE
+          WHEN REGEXP_EXTRACT(kv, r'"([^"]+)":\s*".*?([^"]+)"') = 'f1' THEN DECRYPT_STRING(REGEXP_EXTRACT(kv, r':\s*"([^"]*)"'), mainf.decryption_key)
+          ELSE REGEXP_EXTRACT(kv, r':\s*"([^"]*)"')
+        END AS value
+      FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(account_latest.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS kv
+    ) AS decrypted_rawfields
   FROM
     flattened_data
 ),
@@ -48,13 +37,19 @@ reassembled_data AS (
         (SELECT AS STRUCT ARRAY(
           SELECT AS STRUCT key, value
           FROM UNNEST(
-            SELECT ARRAY(
-              SELECT STRUCT(key, value)
-              FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(decrypted_account_latest.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS pair
+            ARRAY(
+              SELECT STRUCT(
+                REGEXP_EXTRACT(kv, r'"([^"]+)":\s*".*?([^"]+)"') AS key,
+                CASE
+                  WHEN REGEXP_EXTRACT(kv, r'"([^"]+)":\s*".*?([^"]+)"') = 'f1' THEN DECRYPT_STRING(REGEXP_EXTRACT(kv, r':\s*"([^"]*)"'), mainf.decryption_key)
+                  ELSE REGEXP_EXTRACT(kv, r':\s*"([^"]*)"')
+                END AS value
+              )
+              FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(decrypted_rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS kv
             )
           ) AS r
         )) AS rawfields,
-        decrypted_account_latest.stdfields AS stdfields
+        account_latest.stdfields AS stdfields
       ) ORDER BY row_index
     ) AS latest
   FROM
