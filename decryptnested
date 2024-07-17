@@ -1,24 +1,47 @@
-WITH decrypted_data AS (
+WITH flattened_account AS (
   SELECT
     mainf,
-    ARRAY(
-      SELECT AS STRUCT
-        STRUCT(
-          DECRYPT_STRING(latest_entry.rawfields.f1) AS f1,
-          latest_entry.rawfields.f2 AS f2
-        ) AS rawfields,
-        latest_entry.stdfields
-      FROM UNNEST(account.latest) AS latest_entry
-    ) AS account_latest,
-    subject
+    subject,
+    latest_entry.rawfields.f1 AS encrypted_f1,
+    latest_entry.rawfields.f2 AS f2,
+    latest_entry.stdfields,
+    idx
   FROM
-    `your_dataset.your_table`
+    `your_dataset.your_table`,
+    UNNEST(account.latest) AS latest_entry WITH OFFSET AS idx
+),
+decrypted_account AS (
+  SELECT
+    mainf,
+    subject,
+    DECRYPT_STRING(encrypted_f1) AS f1,
+    f2,
+    stdfields,
+    idx
+  FROM
+    flattened_account
+),
+reassembled_account AS (
+  SELECT
+    mainf,
+    subject,
+    ARRAY_AGG(
+      STRUCT(
+        STRUCT(
+          f1,
+          f2
+        ) AS rawfields,
+        stdfields
+      ) ORDER BY idx
+    ) AS latest
+  FROM
+    decrypted_account
+  GROUP BY
+    mainf, subject
 )
 SELECT
   mainf,
-  STRUCT(
-    account_latest AS latest
-  ) AS account,
+  STRUCT(latest AS latest) AS account,
   subject
 FROM
-  decrypted_data;
+  reassembled_account;
