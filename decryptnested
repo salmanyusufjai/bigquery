@@ -14,28 +14,30 @@ decrypted_data AS (
     *,
     ARRAY(
       SELECT AS STRUCT
-        key,
+        REGEXP_EXTRACT(kv, r'"([^"]+)"') AS key,
         CASE
-          WHEN key = 'f1' THEN DECRYPT_STRING(value, decryption_key)
-          ELSE value
+          WHEN REGEXP_EXTRACT(kv, r'"([^"]+)"') = 'f1' THEN DECRYPT_STRING(REGEXP_EXTRACT(kv, r':\s*"([^"]*)"'), decryption_key)
+          ELSE REGEXP_EXTRACT(kv, r':\s*"([^"]*)"')
         END AS value
-      FROM (
-        SELECT 
-          REGEXP_EXTRACT(kv, r'"([^"]+)":') AS key,
-          REGEXP_EXTRACT(kv, r':\s*"([^"]*)"') AS value
-        FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(latest_entry.rawfields), r'"[^"]+":\s*"[^"]*"')) AS kv
-      )
+      FROM UNNEST(REGEXP_EXTRACT_ALL(TO_JSON_STRING(latest_entry.rawfields), r'"([^"]+)":\s*"([^"]*)"')) AS kv
     ) AS decrypted_rawfields
   FROM
     flattened_data
 )
 SELECT
-  *,
-  ARRAY(
-    SELECT AS STRUCT
-      decrypted_rawfields.key,
-      decrypted_rawfields.value,
-      latest_entry.stdfields
+  t.*,
+  ARRAY_AGG(
+    STRUCT(
+      latest_entry.rawfields,
+      latest_entry.stdfields,
+      decrypted_rawfields
+    ) ORDER BY row_index
   ) AS decrypted_latest
 FROM
-  decrypted_data;
+  decrypted_data t
+GROUP BY
+  t.*
+"""
+
+# Execute the query and load decrypted data into a pandas DataFrame
+decrypted_df = client.query(query).to_dataframe()
