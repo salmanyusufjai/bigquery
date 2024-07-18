@@ -1,0 +1,36 @@
+-- Assuming your table is named `my_table` and located in `my_dataset`
+WITH decrypted_data AS (
+  SELECT
+    mainf.entitykey,
+    al.rawfields AS original_rawfields,
+    JSON_REPLACE(al.rawfields, '$.f1', my_dataset.decrypt_string(al.rawfields.f1)) AS updated_rawfields
+  FROM
+    my_dataset.my_table t,
+    UNNEST(t.account.latest) AS al
+)
+UPDATE
+  my_dataset.my_table t
+SET
+  t.account.latest = ARRAY(
+    SELECT AS STRUCT
+      STRUCT(
+        updated_rawfields AS rawfields,
+        al.stdfields AS stdfields
+      )
+    FROM
+      UNNEST(t.account.latest) AS al
+    LEFT JOIN
+      decrypted_data dd
+    ON
+      t.mainf.entitykey = dd.entitykey AND al.rawfields = dd.original_rawfields
+  )
+WHERE
+  EXISTS (
+    SELECT 1
+    FROM
+      UNNEST(t.account.latest) AS al
+    JOIN
+      decrypted_data dd
+    ON
+      t.mainf.entitykey = dd.entitykey AND al.rawfields = dd.original_rawfields
+  );
