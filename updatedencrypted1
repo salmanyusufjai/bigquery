@@ -1,0 +1,19 @@
+UPDATE `your_dataset.your_table` AS t
+SET t.account = (
+  SELECT STRUCT(
+    ARRAY(
+      SELECT AS STRUCT
+        latest_entry.pheader AS pheader,
+        STRUCT(
+          latest_entry.rawfields.* REPLACE(
+            DECRYPT_FUNCTION(t.mainf.d1, latest_entry.rawfields.f1) AS f1
+          ) AS rawfields,
+        latest_entry.stdfields.* REPLACE(
+            DECRYPT_FUNCTION(t.mainf.d1, latest_entry.stdfields.s1) AS s1
+          ) AS stdfields
+      ) AS latest_entry
+      FROM UNNEST(t.account.latest) AS latest_entry
+    ) AS latest
+  )
+)
+WHERE t.mainf.entitykey = '123456789';  -- Add your condition here
