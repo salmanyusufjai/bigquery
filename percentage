@@ -1,0 +1,39 @@
+WITH value_mapping AS (
+  SELECT 
+    t1.outref10,
+    t1.char11 AS char11_table1,
+    t2.char11 AS char11_table2
+  FROM 
+    table1 t1
+  JOIN 
+    table2 t2
+  ON 
+    t1.outref10 = t2.outref10
+),
+mapping_counts AS (
+  SELECT 
+    char11_table1,
+    char11_table2,
+    COUNT(*) AS count_records
+  FROM 
+    value_mapping
+  GROUP BY 
+    char11_table1, char11_table2
+),
+total_counts AS (
+  SELECT 
+    SUM(count_records) AS total_records
+  FROM 
+    mapping_counts
+)
+SELECT 
+  m.char11_table1 AS value_in_table1,
+  m.char11_table2 AS value_in_table2,
+  m.count_records,
+  ROUND((m.count_records / t.total_records) * 100, 2) AS percentage
+FROM 
+  mapping_counts m
+CROSS JOIN 
+  total_counts t
+ORDER BY 
+  percentage DESC;
